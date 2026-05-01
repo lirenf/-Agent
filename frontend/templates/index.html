@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>论文深度分析 Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+</head>
+<body>
+  <div class="scanlines"></div>
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">∫</div>
+        <div class="brand-text">
+          <span class="brand-name">PAPER<span class="accent">·</span>AGENT</span>
+          <span class="brand-sub">高并发科研论文深度分析系统 v1.0</span>
+        </div>
+      </div>
+      <div class="header-stats">
+        <div class="stat-pill"><span class="stat-label">论文库</span><span class="stat-val" id="statPapers">0</span></div>
+        <div class="stat-pill"><span class="stat-label">分析任务</span><span class="stat-val" id="statTasks">0</span></div>
+        <div class="stat-pill active"><span class="stat-label">并发运行</span><span class="stat-val" id="statRunning">0</span></div>
+      </div>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="panel" id="ingestPanel">
+        <div class="panel-header"><span class="panel-icon">⊕</span><span>添加论文</span></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="upload">PDF上传</button>
+          <button class="tab" data-tab="arxiv">arXiv</button>
+          <button class="tab" data-tab="text">文本</button>
+        </div>
+        <div class="tab-content active" id="tab-upload">
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-icon">⬆</div>
+            <div class="drop-text">拖拽 PDF 到此处</div>
+            <div class="drop-sub">或点击选择文件（最大 50MB）</div>
+            <input type="file" id="fileInput" accept=".pdf" multiple hidden />
+          </div>
+          <input class="input" type="text" id="uploadTitle" placeholder="论文标题（可选）" />
+          <button class="btn btn-primary" id="uploadBtn" disabled>上传并解析</button>
+        </div>
+        <div class="tab-content" id="tab-arxiv">
+          <label class="label">arXiv ID 或 URL</label>
+          <input class="input" type="text" id="arxivInput" placeholder="2312.11805 或 arxiv.org/abs/..." />
+          <div class="checkbox-row"><input type="checkbox" id="includePdf" checked /><label for="includePdf">下载全文 PDF（推荐）</label></div>
+          <button class="btn btn-primary" id="arxivBtn">获取论文</button>
+        </div>
+        <div class="tab-content" id="tab-text">
+          <input class="input" type="text" id="textTitle" placeholder="论文标题 *" />
+          <textarea class="input textarea" id="textContent" placeholder="粘贴论文内容或摘要..." rows="6"></textarea>
+          <button class="btn btn-primary" id="textBtn">添加论文</button>
+        </div>
+      </section>
+      <section class="panel" id="libraryPanel">
+        <div class="panel-header">
+          <span class="panel-icon">◧</span><span>论文库</span>
+          <button class="btn-icon" id="refreshLibrary" title="刷新">↻</button>
+        </div>
+        <div class="search-bar"><span>⌕</span><input type="text" id="paperSearch" placeholder="搜索论文..." /></div>
+        <div class="paper-list" id="paperList"><div class="empty-state">暂无论文，请先添加</div></div>
+        <div class="batch-bar">
+          <span id="batchCount">0 篇已选</span>
+          <div class="batch-actions">
+            <button class="btn btn-sm" id="batchDeepBtn">深度分析</button>
+            <button class="btn btn-sm btn-outline" id="batchQuickBtn">快速摘要</button>
+            <button class="btn btn-sm btn-outline" id="compareBtn">比较分析</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+    <main class="main-content">
+      <div class="content-header">
+        <h2 class="section-title">分析任务监控</h2>
+        <div class="header-actions">
+          <button class="btn btn-sm btn-outline" id="clearCompleted">清理已完成</button>
+          <button class="btn btn-sm btn-outline" id="refreshTasks">刷新</button>
+        </div>
+      </div>
+      <div class="concurrency-viz">
+        <div class="viz-header">
+          <span class="viz-label">并发槽位（最大 5）</span>
+          <span class="viz-desc">每个槽位对应一个并发 API 调用</span>
+        </div>
+        <div class="slots" id="slots">
+          <div class="slot" data-slot="0"><span>1</span></div>
+          <div class="slot" data-slot="1"><span>2</span></div>
+          <div class="slot" data-slot="2"><span>3</span></div>
+          <div class="slot" data-slot="3"><span>4</span></div>
+          <div class="slot" data-slot="4"><span>5</span></div>
+        </div>
+      </div>
+      <div class="task-grid" id="taskGrid">
+        <div class="empty-state large">
+          <div class="empty-icon">⬡</div>
+          <div>提交论文开始分析</div>
+          <div class="empty-sub">支持多篇论文同时并发分析</div>
+        </div>
+      </div>
+    </main>
+    <aside class="result-panel">
+      <div class="result-header">
+        <span>分析结果</span>
+        <div class="result-actions">
+          <button class="btn btn-sm btn-outline" id="exportMd" disabled>导出 MD</button>
+          <button class="btn btn-sm btn-outline" id="exportJson" disabled>导出 JSON</button>
+        </div>
+      </div>
+      <div class="result-body" id="resultBody">
+        <div class="empty-state"><div class="empty-icon">◈</div><div>点击任务查看结果</div></div>
+      </div>
+    </aside>
+  </div>
+  <div id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" hidden>
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">处理中...</div>
+  </div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

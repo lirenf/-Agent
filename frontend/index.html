@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PaperMind — 论文深度分析 Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@300;400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- ░░ NOISE OVERLAY ░░ -->
+<div class="noise"></div>
+<div class="grid-bg"></div>
+
+<!-- ░░ HEADER ░░ -->
+<header class="header">
+  <div class="logo">
+    <span class="logo-icon">◈</span>
+    <span class="logo-text">PaperMind</span>
+    <span class="logo-sub">Research Intelligence Agent</span>
+  </div>
+  <nav class="nav">
+    <button class="nav-btn active" data-tab="single">单篇分析</button>
+    <button class="nav-btn" data-tab="batch">批量并发</button>
+    <button class="nav-btn" data-tab="compare">论文对比</button>
+  </nav>
+  <div class="header-status">
+    <span class="status-dot" id="apiStatus"></span>
+    <span id="apiStatusText">连接中...</span>
+  </div>
+</header>
+
+<!-- ░░ MAIN ░░ -->
+<main class="main">
+
+  <!-- ═══ TAB: 单篇分析 ═══ -->
+  <section class="tab-panel active" id="tab-single">
+    <div class="panel-grid">
+
+      <!-- Left: Input -->
+      <div class="input-panel">
+        <div class="panel-header">
+          <h2>论文输入</h2>
+          <div class="input-tabs">
+            <button class="itab active" data-input="text">📝 文本</button>
+            <button class="itab" data-input="url">🔗 URL</button>
+            <button class="itab" data-input="pdf">📄 PDF</button>
+          </div>
+        </div>
+
+        <!-- Text Input -->
+        <div class="input-area active" id="input-text">
+          <textarea id="paperText" placeholder="粘贴论文全文或摘要…&#10;&#10;支持中英文，建议包含标题、摘要、正文等完整内容以获得最佳分析效果。"></textarea>
+          <div class="char-count"><span id="charCount">0</span> 字符</div>
+        </div>
+
+        <!-- URL Input -->
+        <div class="input-area" id="input-url">
+          <div class="url-input-wrap">
+            <input type="text" id="paperUrl" placeholder="https://arxiv.org/abs/2310.xxxxx">
+            <div class="url-hint">支持 arXiv / ACM / IEEE / Springer / 普通网页</div>
+          </div>
+        </div>
+
+        <!-- PDF Input -->
+        <div class="input-area" id="input-pdf">
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-icon">⬆</div>
+            <div class="drop-text">拖拽 PDF 至此处</div>
+            <div class="drop-sub">或点击选择文件（最大 50MB）</div>
+            <input type="file" id="pdfFile" accept=".pdf" hidden>
+          </div>
+          <div class="file-info" id="fileInfo" style="display:none"></div>
+        </div>
+
+        <!-- Mode & Options -->
+        <div class="options-row">
+          <div class="option-group">
+            <label>分析深度</label>
+            <div class="mode-btns">
+              <button class="mode-btn" data-mode="quick"><span>⚡</span>快速</button>
+              <button class="mode-btn active" data-mode="standard"><span>📊</span>标准</button>
+              <button class="mode-btn" data-mode="deep"><span>🔬</span>深度</button>
+            </div>
+          </div>
+          <div class="option-group" id="dimensionGroup" style="display:none">
+            <label>附加维度</label>
+            <div class="dim-checks">
+              <label class="dim-check"><input type="checkbox" value="methodology"> 方法论</label>
+              <label class="dim-check"><input type="checkbox" value="experiments"> 实验</label>
+              <label class="dim-check"><input type="checkbox" value="novelty"> 创新性</label>
+              <label class="dim-check"><input type="checkbox" value="impact"> 影响力</label>
+              <label class="dim-check"><input type="checkbox" value="limitations"> 局限性</label>
+            </div>
+          </div>
+        </div>
+
+        <button class="analyze-btn" id="analyzeBtn">
+          <span class="btn-icon">◈</span>
+          <span class="btn-text">开始分析</span>
+          <div class="btn-shimmer"></div>
+        </button>
+      </div>
+
+      <!-- Right: Result -->
+      <div class="result-panel" id="resultPanel">
+        <div class="result-header">
+          <h2>分析结果</h2>
+          <div class="result-actions" id="resultActions" style="display:none">
+            <button class="action-btn" id="copyBtn">复制</button>
+            <button class="action-btn" id="exportMdBtn">导出 MD</button>
+            <button class="action-btn" id="clearBtn">清空</button>
+          </div>
+        </div>
+        <div class="result-body" id="resultBody">
+          <div class="placeholder">
+            <div class="placeholder-icon">◈</div>
+            <div class="placeholder-title">等待分析</div>
+            <div class="placeholder-desc">输入论文内容，选择分析深度，点击开始</div>
+          </div>
+        </div>
+        <div class="result-footer" id="resultFooter" style="display:none">
+          <span id="tokenInfo"></span>
+          <span id="timeInfo"></span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══ TAB: 批量并发 ═══ -->
+  <section class="tab-panel" id="tab-batch">
+    <div class="batch-layout">
+      <div class="batch-input">
+        <div class="panel-header">
+          <h2>批量论文队列</h2>
+          <div class="batch-mode-row">
+            <select id="batchMode" class="select-control">
+              <option value="quick">⚡ 快速扫描</option>
+              <option value="standard" selected>📊 标准分析</option>
+              <option value="deep">🔬 深度分析</option>
+            </select>
+            <span class="concurrency-badge">并发数: <strong>5</strong></span>
+          </div>
+        </div>
+
+        <div class="batch-add">
+          <textarea id="batchText" placeholder="在此输入论文文本&#10;──────────&#10;（每次添加一篇）"></textarea>
+          <input type="text" id="batchTitle" placeholder="论文标题（选填）" class="batch-title-input">
+          <button class="add-paper-btn" id="addPaperBtn">+ 加入队列</button>
+        </div>
+
+        <div class="queue-list" id="queueList">
+          <div class="queue-empty">队列为空，请先添加论文</div>
+        </div>
+
+        <button class="analyze-btn batch-analyze-btn" id="batchAnalyzeBtn" disabled>
+          <span class="btn-icon">⚡</span>
+          <span class="btn-text">并发分析全部 (<span id="queueCount">0</span>)</span>
+        </button>
+      </div>
+
+      <div class="batch-results" id="batchResults">
+        <div class="panel-header"><h2>批量结果</h2></div>
+        <div class="batch-progress" id="batchProgress" style="display:none">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-text" id="progressText">正在初始化...</div>
+        </div>
+        <div class="batch-result-list" id="batchResultList">
+          <div class="placeholder">
+            <div class="placeholder-icon">⚡</div>
+            <div class="placeholder-title">高并发分析引擎</div>
+            <div class="placeholder-desc">最多同时处理 5 篇论文</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TAB: 论文对比 ═══ -->
+  <section class="tab-panel" id="tab-compare">
+    <div class="compare-layout">
+      <div class="compare-input">
+        <div class="panel-header"><h2>添加对比论文</h2></div>
+        <div class="compare-slots" id="compareSlots">
+          <!-- dynamically generated -->
+        </div>
+        <button class="add-slot-btn" id="addSlotBtn">+ 添加论文</button>
+        <button class="analyze-btn compare-analyze-btn" id="compareAnalyzeBtn">
+          <span class="btn-icon">⚖</span>
+          <span class="btn-text">开始对比分析</span>
+        </button>
+      </div>
+      <div class="compare-result">
+        <div class="panel-header"><h2>对比报告</h2></div>
+        <div class="result-body" id="compareResultBody">
+          <div class="placeholder">
+            <div class="placeholder-icon">⚖</div>
+            <div class="placeholder-title">多论文对比</div>
+            <div class="placeholder-desc">添加 2-6 篇论文，一键生成横向对比报告</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ░░ TOAST ░░ -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
